@@ -41,7 +41,13 @@ class AbstractWaveGuideClass(ABC):
 
     @abstractmethod
     def __call__(self, f: float):
-        pass
+        if isinstance(f, (float, int)):
+            if f > 0:
+                pass
+            else:
+                raise ValueError(f"'f' must be positive; got {f} instead.")
+        else:
+            raise TypeError(f"'f' must be of type 'float' or 'int'; got '{type(f).__name__}' instead.")
 
     def __str__(self):
         return f"<WaveGuid>({self._name})"
@@ -93,7 +99,7 @@ class WaveGuide(AbstractWaveGuideClass):
         return self
 
     def __call__(self, f: float):
-        """Compute wave velocities.
+        """Compute wave velocities for provided frequency.
 
         Parameters
         ----------
