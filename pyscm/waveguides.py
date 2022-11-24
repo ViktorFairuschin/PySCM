@@ -15,13 +15,28 @@ class AbstractWaveGuideClass(ABC):
     @abstractmethod
     def __init__(self, layers: list, name: str):
 
+        self._layers = []
+
+        if isinstance(layers, list):
+            for layer in layers:
+                self.add(layer)
+        else:
+            raise TypeError(f"'layers' must be of type 'list'; got '{type(layers).__name__}' instead.")
+
         if isinstance(name, str):
             self._name = str(name)
         else:
             raise TypeError(f"'name' must be of type 'str'; got '{type(name).__name__}' instead.")
 
     @abstractmethod
-    def __build__(self, n: int):
+    def add(self, layer: ElasticLayer):
+        if isinstance(layer, ElasticLayer):
+            self._layers.append(layer)
+        else:
+            raise TypeError(f"'layer' must be of type 'ElasticLayer'; got '{type(layer).__name__}' instead.")
+
+    @abstractmethod
+    def build(self, n: int):
         pass
 
     @abstractmethod
@@ -35,23 +50,38 @@ class AbstractWaveGuideClass(ABC):
     def name(self):
         return self._name
 
+    @property
+    def layers(self):
+        return self._layers
+
 
 class WaveGuide(AbstractWaveGuideClass):
     """Waveguide class"""
 
-    def __init__(self, layers: list = [], name: str = 'waveguide'):
+    def __init__(self, layers: list = None, name: str = 'waveguide'):
         """Create waveguide object.
 
         Parameters
         ----------
-        layers : list of ElasticLayer objects
+        layers : list
             List of layers.
         name : str
             Waveguide's name (optional).
         """
         super(WaveGuide, self).__init__(layers, name)
 
-    def __build__(self, n: int):
+    def add(self, layer: ElasticLayer):
+        """Add layer to waveguide.
+
+        Parameters
+        ----------
+        layer : ElasticLayer
+            Layer to be added to waveguide.
+        """
+        super(WaveGuide, self).add(layer)
+        return self
+
+    def build(self, n: int):
         """Build waveguide.
 
         Parameters
@@ -59,7 +89,8 @@ class WaveGuide(AbstractWaveGuideClass):
         n : int
             Number of collocation points.
         """
-        super(WaveGuide, self).__build__()
+        super(WaveGuide, self).build(n)
+        return self
 
     def __call__(self, f: float):
         """Compute wave velocities.
@@ -69,11 +100,13 @@ class WaveGuide(AbstractWaveGuideClass):
         f : float
             Frequency in Hz.
         """
-        super(WaveGuide, self).__call__()
+        super(WaveGuide, self).__call__(f)
 
 
 if __name__ == '__main__':
 
-    waveguide = WaveGuide([5])
-    print(waveguide)
+    layer = ElasticLayer(6350, 3100, 2400, 1e-3, 'aluminium')
+    waveguide = WaveGuide([layer]).add(layer)
+    print(waveguide.layers)
+
 
