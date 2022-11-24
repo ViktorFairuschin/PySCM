@@ -133,3 +133,4 @@ dmypy.json
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/PySCM.iml
 /.idea/vcs.xml
+/sympy/

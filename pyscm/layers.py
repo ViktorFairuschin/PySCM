@@ -1,18 +1,17 @@
 # Copyright Viktor Fairuschin 2022
 
-
 from abc import ABC
 from abc import abstractmethod
 
 import numpy as np
+from scipy.linalg import toeplitz
 
 
 class AbstractElasticLayerClass(ABC):
-    """Abstract elastic layer class.
-    """
+    """Abstract elastic layer class"""
 
     @abstractmethod
-    def __init__(self, cl: float, ct: float, rho: float, d: float, n: int, name: str):
+    def __init__(self, cl: float, ct: float, rho: float, d: float, name: str):
 
         if isinstance(cl, (float, int)):
             if cl > 0:
@@ -46,6 +45,14 @@ class AbstractElasticLayerClass(ABC):
         else:
             raise TypeError(f"'d' must be of type 'float' or 'int'; got '{type(d).__name__}' instead.")
 
+        if isinstance(name, str):
+            self._name = str(name)
+        else:
+            raise TypeError(f"'name' must be of type 'str'; got '{type(name).__name__}' instead.")
+
+    @abstractmethod
+    def __call__(self, n: int):
+
         if isinstance(n, int):
             if n > 0:
                 self._n = int(n)
@@ -53,15 +60,6 @@ class AbstractElasticLayerClass(ABC):
                 raise ValueError(f"'n' must be positive; got {n} instead.")
         else:
             raise TypeError(f"'n' must be of type 'int'; got '{type(n).__name__}' instead.")
-
-        if isinstance(name, str):
-            self._name = str(name)
-        else:
-            raise TypeError(f"'name' must be of type 'str'; got '{type(name).__name__}' instead.")
-
-    @abstractmethod
-    def __build__(self, n: int):
-        pass
 
     def __str__(self):
         return f"<ElasticLayer>({self._name})"
@@ -83,17 +81,14 @@ class AbstractElasticLayerClass(ABC):
         return self._d
 
     @property
-    def n(self):
-        return self._n
-
-    @property
     def name(self):
         return self._name
 
 
 class ElasticLayer(AbstractElasticLayerClass):
+    """Elastic layer class"""
 
-    def __init__(self, cl: float, ct: float, rho: float, d: float, n: int = 16, name: str = 'layer'):
+    def __init__(self, cl: float, ct: float, rho: float, d: float, name: str = 'layer'):
         """Create elastic layer object.
 
         Parameters
@@ -106,26 +101,77 @@ class ElasticLayer(AbstractElasticLayerClass):
             Layer's mass density in kg/m^3
         d : float
             Layer's thickness in m
-        n : int
-            Number of collocation points, default 16
         name : str
             Layer's name (optional)
         """
-        super(ElasticLayer, self).__init__(cl, ct, rho, d, n, name)
+        super(ElasticLayer, self).__init__(cl, ct, rho, d, name)
 
-        self.lhs = np.array([])
-        self.rhs = np.array([])
-        self.sig = np.array([])
-        self.eps = np.array([])
+    def __call__(self, n: int):
+        """Return layer's matrices.
 
-        self.__build__(self.n)
+        Parameters
+        ----------
+        n : int
+            Number of collocation points.
+        """
+        super(ElasticLayer, self).__call__(n)
 
-    def __build__(self, n: int):
-        # TODO: continue here
-        pass
+        # Rescale elastic constants to increase numerical stability
+
+        cl = self.cl / 1.0e3
+        ct = self.ct / 1.0e3
+        d = self.d * 1.0e6
+        la, mu = self._lame_constants()
+
+        # Compute Chebyshev differentiation matrices
+
+        _, dm = chebyshev_dm(n, 2)
+        dm_one = dm[0, :, :] * (2 / d) ** 1
+        dm_two = dm[1, :, :] * (2 / d) ** 2
+
+        # Compute frequently used constants
+
+        i = 1j
+        eye = np.eye(n)
+        zeros = np.zeros_like(eye)
+
+        # Assemble the equations
+
+        lhs = np.stack([
+            np.block([[dm_two, zeros], [zeros, dm_two]]),
+            np.block([[zeros, zeros], [zeros, zeros]]),
+            np.block([[- eye, zeros], [zeros, - eye]])
+        ])
+
+        rhs = np.block([
+            [np.diag(np.ones(n) * (-1 / cl ** 2)), zeros],
+            [zeros, np.diag(np.ones(n) * (-1 / ct ** 2))]
+        ])
+
+        sig = np.stack([
+            np.block([[zeros, mu / i * dm_two], [(la + 2 * mu) * dm_two, zeros]]),
+            np.block([[- 2 * la / i * dm_one, zeros], [zeros, - 2 * mu * dm_one]]),
+            np.block([[zeros, mu / i * eye], [- la * eye, zeros]])
+        ])
+
+        eps = np.stack([
+            np.block([[dm_one, zeros], [zeros, - dm_one]]),
+            np.block([[zeros, - eye], [i * eye, zeros]]),
+            np.block([[zeros, zeros], [zeros, zeros]])
+        ])
+
+        return lhs, rhs, sig, eps
+
+    def _lame_constants(self):
+        """Compute Lame constants.
+        """
+        mu = self.rho * self.ct ** 2
+        la = self.rho * self.cl ** 2 - 2 * mu
+
+        return la, mu
 
     @classmethod
-    def from_elastic_constants(cls, E: float, rho: float, nu: float, d: float, n: int = 16, name: str = "layer"):
+    def from_elastic_constants(cls, E: float, rho: float, nu: float, d: float, name: str = "layer"):
         """Create elastic layer object using elastic constants.
 
         Parameters
@@ -138,8 +184,6 @@ class ElasticLayer(AbstractElasticLayerClass):
             Layer's Poisson's ratio
         d : float
             Layer's thickness in m
-        n : int
-            Number of collocation points, default 16
         name : str
             Layer's name (optional)
         """
@@ -168,34 +212,69 @@ class ElasticLayer(AbstractElasticLayerClass):
         else:
             raise TypeError(f"'nu' must be of type 'float' or 'int'; got '{type(nu).__name__}' instead.")
 
-        if isinstance(d, (float, int)):
-            if d > 0:
-                d = float(d)
-            else:
-                raise ValueError(f"'d' must be positive; got {d} instead.")
-        else:
-            raise TypeError(f"'d' must be of type 'float' or 'int'; got '{type(d).__name__}' instead.")
-
-        if isinstance(n, int):
-            if n > 0:
-                n = int(n)
-            else:
-                raise ValueError(f"'n' must be positive; got {n} instead.")
-        else:
-            raise TypeError(f"'n' must be of type 'int'; got '{type(n).__name__}' instead.")
-
-        if isinstance(name, str):
-            name = str(name)
-        else:
-            raise TypeError(f"'name' must be of type 'str'; got '{type(name).__name__}' instead.")
+        # this can still result in cl/ct <= 0!
 
         cl = np.sqrt((E * (1 - nu)) / (rho * (1 - nu - 2 * np.square(nu))))
         ct = np.sqrt(E / (2 * rho * (1 + nu)))
 
-        return cls(cl, ct, rho, d, n, name)
+        return cls(cl, ct, rho, d, name)
+
+
+def chebyshev_dm(n: int, m: int) -> (np.ndarray, np.ndarray):
+    """Compute Chebyshev differentiation matrices.
+
+    Parameters
+    ----------
+    n : int
+        Number of collocation points.
+    m : int
+        Order of the highest derivative.
+
+    Returns
+    -------
+    x : array of shape (n)
+        Chebyshev collocation points.
+    dm : array of shape (m, n, n)
+        Chebyshev differentiation matrices.
+    """
+
+    x = np.cos(np.pi * np.linspace(n - 1, 0, n) / (n - 1))
+    x = x[::-1]
+
+    dm = np.zeros((m, n, n))
+
+    n1 = int(n / 2)
+    n2 = int(round(n / 2.))
+    k = np.arange(n)
+    th = k * np.pi / (n - 1)
+
+    T = np.tile(th / 2, (n, 1))
+    dx = 2 * np.sin(T.T + T) * np.sin(T.T - T)
+    dx[n1:, :] = -np.flipud(np.fliplr(dx[0:n2, :]))
+    dx[range(n), range(n)] = 1.
+    dx = dx.T
+
+    c = toeplitz((-1.) ** k)
+    c[0, :] *= 2
+    c[-1, :] *= 2
+    c[:, 0] *= 0.5
+    c[:, -1] *= 0.5
+
+    z = 1. / dx
+    z[range(n), range(n)] = 0.
+
+    d = np.eye(n)
+
+    for ell in range(m):
+        d = (ell + 1) * z * (c * np.tile(np.diag(d), (n, 1)).T - d)
+        d[range(n), range(n)] = -np.sum(d, axis=1)
+        dm[ell, :, :] = d
+
+    return x, dm
 
 
 if __name__ == '__main__':
 
-    layer = ElasticLayer.from_elastic_constants(5, 13, 15, 4, n=16, name='hello')
-    print(layer)
+    layer = ElasticLayer.from_elastic_constants(E=1, rho=1, nu=0.1, d=1, name='aluminium')
+    print(layer(16))
+
