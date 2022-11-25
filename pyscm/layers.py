@@ -107,7 +107,7 @@ class ElasticLayer(AbstractElasticLayerClass):
         super(ElasticLayer, self).__init__(cl, ct, rho, d, name)
 
     def __call__(self, n: int):
-        """Return layer's matrices.
+        """Return layer's equations.
 
         Parameters
         ----------
@@ -116,12 +116,14 @@ class ElasticLayer(AbstractElasticLayerClass):
         """
         super(ElasticLayer, self).__call__(n)
 
-        # Rescale elastic constants to increase numerical stability
+        # Rescale elastic constants to prevent numeric errors
 
         cl = self.cl / 1.0e3
         ct = self.ct / 1.0e3
         d = self.d * 1.0e6
-        la, mu = self._lame_constants()
+
+        la = self.rho * (self.cl ** 2 - 2 * self.ct ** 2) / 10.0e18
+        mu = self.rho * self.ct ** 2 / 10.0e6
 
         # Compute Chebyshev differentiation matrices
 
@@ -129,13 +131,11 @@ class ElasticLayer(AbstractElasticLayerClass):
         dm_one = dm[0, :, :] * (2 / d) ** 1
         dm_two = dm[1, :, :] * (2 / d) ** 2
 
-        # Compute frequently used constants
+        # Assemble the equations
 
         i = 1j
         eye = np.eye(n)
         zeros = np.zeros_like(eye)
-
-        # Assemble the equations
 
         lhs = np.stack([
             np.block([[dm_two, zeros], [zeros, dm_two]]),
@@ -143,10 +143,7 @@ class ElasticLayer(AbstractElasticLayerClass):
             np.block([[- eye, zeros], [zeros, - eye]])
         ])
 
-        rhs = np.block([
-            [np.diag(np.ones(n) * (-1 / cl ** 2)), zeros],
-            [zeros, np.diag(np.ones(n) * (-1 / ct ** 2))]
-        ])
+        rhs = np.block([[(- 1 / cl ** 2) * eye, zeros], [zeros, (- 1 / ct ** 2) * eye]])
 
         sig = np.stack([
             np.block([[zeros, mu / i * dm_two], [(la + 2 * mu) * dm_two, zeros]]),
@@ -155,20 +152,12 @@ class ElasticLayer(AbstractElasticLayerClass):
         ])
 
         eps = np.stack([
-            np.block([[dm_one, zeros], [zeros, - dm_one]]),
+            np.block([[dm_one, zeros], [zeros, - i * dm_one]]),
             np.block([[zeros, - eye], [i * eye, zeros]]),
             np.block([[zeros, zeros], [zeros, zeros]])
         ])
 
         return lhs, rhs, sig, eps
-
-    def _lame_constants(self):
-        """Compute Lame constants.
-        """
-        mu = self.rho * self.ct ** 2
-        la = self.rho * self.cl ** 2 - 2 * mu
-
-        return la, mu
 
     @classmethod
     def from_elastic_constants(cls, E: float, rho: float, nu: float, d: float, name: str = "layer"):
@@ -274,7 +263,5 @@ def chebyshev_dm(n: int, m: int) -> (np.ndarray, np.ndarray):
 
 
 if __name__ == '__main__':
-
-    layer = ElasticLayer.from_elastic_constants(E=1, rho=1, nu=0.1, d=1, name='aluminium')
-    print(layer(16))
+    pass
 
