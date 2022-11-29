@@ -147,7 +147,7 @@ class ElasticLayer(AbstractElasticLayerClass):
 
         sig = np.stack([
             np.block([[zeros, mu / i * dm_two], [(la + 2 * mu) * dm_two, zeros]]),
-            np.block([[- 2 * la / i * dm_one, zeros], [zeros, - 2 * mu * dm_one]]),
+            np.block([[- 2 * mu / i * dm_one, zeros], [zeros, - 2 * mu * dm_one]]),
             np.block([[zeros, mu / i * eye], [- la * eye, zeros]])
         ])
 
@@ -264,4 +264,3 @@ def chebyshev_dm(n: int, m: int) -> (np.ndarray, np.ndarray):
 
 if __name__ == '__main__':
     pass
-

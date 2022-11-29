@@ -201,6 +201,7 @@ class WaveGuide(AbstractWaveGuideClass):
         k = eig(a=lhs, b=rhs, right=False)
         k = k[np.isfinite(k)]
         k = k[np.real(k) > 0]
+        # k = np.abs(k)
 
         # Rescale results to the original order of magnitude
 
