@@ -178,7 +178,7 @@ class WaveGuide(AbstractWaveGuideClass):
         return self
 
     def __call__(self, f: float):
-        """Compute wave numbers.
+        """Solve the equations for provided frequency.
 
         Parameters
         ----------
@@ -198,21 +198,26 @@ class WaveGuide(AbstractWaveGuideClass):
         lhs = np.block([[- self.lhs[1], - (self.lhs[0] - omega ** 2 * self.rhs)], [eye, zeros]])
         rhs = np.block([[self.lhs[2], zeros], [zeros, eye]])
 
-        result = eig(a=lhs, b=rhs, right=False)
-        result = np.where(np.isinf(result), 0, result) * 1.0e6
+        k, u = eig(a=lhs, b=rhs, left=False, right=True)
 
-        return result
+        # Rescale wave numbers to original order of magnitude
+
+        k = np.where(np.isinf(k), 0, k) * 1.0e6
+
+        # Keep only positive wave numbers with small imaginary part
+
+        k = np.where(np.abs(np.imag(k)) < 1, k, np.nan)
+        k = np.where(k > 0, np.abs(k), np.nan)
+
+        return k, u
+
+    @staticmethod
+    def process_results(results):
+        pass
+
 
 
 if __name__ == '__main__':
-
-    waveguide = WaveGuide([
-        ElasticLayer(6350, 3100, 2700, 1e-3, 'aluminium'),
-        ElasticLayer(6350, 3100, 2700, 1e-3, 'aluminium')
-    ]).build(16)
-
-    k = waveguide(1e6)
-
-    print(k)
+    pass
 
 
