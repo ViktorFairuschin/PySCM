@@ -198,33 +198,21 @@ class WaveGuide(AbstractWaveGuideClass):
         lhs = np.block([[- self.lhs[1], - (self.lhs[0] - omega ** 2 * self.rhs)], [eye, zeros]])
         rhs = np.block([[self.lhs[2], zeros], [zeros, eye]])
 
-        k = eig(a=lhs, b=rhs, right=False)
-        k = k[np.isfinite(k)]
-        k = k[np.real(k) > 0]
+        result = eig(a=lhs, b=rhs, right=False)
+        result = np.where(np.isinf(result), 0, result) * 1.0e6
 
-        # Rescale results to the original order of magnitude
-
-        k *= 1.0e6
-
-        return k
+        return result
 
 
 if __name__ == '__main__':
 
-    import matplotlib.pyplot as plt
-
     waveguide = WaveGuide([
         ElasticLayer(6350, 3100, 2700, 1e-3, 'aluminium'),
         ElasticLayer(6350, 3100, 2700, 1e-3, 'aluminium')
-    ]).build()
+    ]).build(16)
 
-    fig, ax = plt.subplots()
-    for f in np.linspace(1e3, 10e6, 100):
-        k = waveguide(f)
-        c = 2 * np.pi * f / k
-        ax.scatter(np.ones_like(c) * f, c, color='red', s=1)
-    ax.set_ylim(0, 10000)
-    plt.show()
+    k = waveguide(1e6)
 
-    print(waveguide(1e6))
+    print(k)
+
 
