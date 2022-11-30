@@ -123,7 +123,7 @@ class ElasticLayer(AbstractElasticLayerClass):
         d = self.d * 1.0e6
 
         la = self.rho * (self.cl ** 2 - 2 * self.ct ** 2) / 10.0e18
-        mu = self.rho * self.ct ** 2 / 10.0e6
+        mu = self.rho * self.ct ** 2 / 10.0e18
 
         # Compute Chebyshev differentiation matrices
 
