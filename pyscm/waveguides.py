@@ -75,7 +75,7 @@ class AbstractWaveGuideClass(ABC):
 class WaveGuide(AbstractWaveGuideClass):
     """Waveguide class"""
 
-    def __init__(self, layers: list = None, name: str = 'waveguide'):
+    def __init__(self, layers: list = [], name: str = 'waveguide'):
         """Create waveguide object.
 
         Parameters
@@ -214,7 +214,6 @@ class WaveGuide(AbstractWaveGuideClass):
     @staticmethod
     def process_results(results):
         pass
-
 
 
 if __name__ == '__main__':
