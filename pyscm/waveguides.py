@@ -205,14 +205,6 @@ class WaveGuide(AbstractWaveGuideClass):
 
 
 if __name__ == '__main__':
-
-    waveguide = WaveGuide([
-        ElasticLayer(6350, 3100, 2700, 1e-3, 'aluminium'),
-        ElasticLayer(6350, 3100, 2700, 1e-3, 'aluminium')
-    ]).build(16)
-
-    k = waveguide(1e6)
-
-    print(k)
+    pass
 
 
